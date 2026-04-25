@@ -1,0 +1,123 @@
+workflows:
+
+  # ─────────────────────────────────────────────────────────────────
+  # Workflow 1: Simulator build (no signing needed — fast feedback)
+  # ─────────────────────────────────────────────────────────────────
+  ios-simulator:
+    name: HabitJourney — Simulator Build
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: "main"
+          include: true
+
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+
+      - name: Generate Xcode project
+        script: xcodegen generate --spec project.yml
+
+      - name: Set Swift version
+        script: swift --version
+
+      - name: Build for simulator (no signing)
+        script: |
+          xcodebuild build \
+            -scheme HabitJourney \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --color
+
+    artifacts:
+      - build/Build/Products/**/*.app
+
+    publishing:
+      email:
+        recipients:
+          - sreeharsha.kelam@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  # ─────────────────────────────────────────────────────────────────
+  # Workflow 2: Signed IPA for TestFlight / Ad Hoc
+  # Requires Apple Developer account configured in Codemagic
+  # ─────────────────────────────────────────────────────────────────
+  ios-release:
+    name: HabitJourney — TestFlight Release
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store   # change to 'ad_hoc' for direct install
+        bundle_identifier: com.habitjourney.app
+      vars:
+        APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)   # replace with CM secret
+        APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)
+        APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)
+        CERTIFICATE_PRIVATE_KEY: Encrypted(...)
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "v*"
+          include: true
+
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+
+      - name: Generate Xcode project
+        script: xcodegen generate --spec project.yml
+
+      - name: Set up keychain & provisioning
+        script: keychain initialize
+
+      - name: Fetch signing files from App Store Connect
+        script: |
+          app-store-connect fetch-signing-files com.habitjourney.app \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Set up code signing settings
+        script: xcode-project use-profiles
+
+      - name: Build & archive
+        script: |
+          xcodebuild archive \
+            -scheme HabitJourney \
+            -configuration Release \
+            -archivePath build/HabitJourney.xcarchive \
+            | xcpretty --color
+
+      - name: Export IPA
+        script: |
+          xcodebuild -exportArchive \
+            -archivePath build/HabitJourney.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist
+
+    artifacts:
+      - build/ipa/*.ipa
+      - build/HabitJourney.xcarchive
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+      email:
+        recipients:
+          - sreeharsha.kelam@gmail.com
+        notify:
+          success: true
+          failure: true
