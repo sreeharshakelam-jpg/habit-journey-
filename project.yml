@@ -29,7 +29,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.habitjourney.app
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "11"
+        CURRENT_PROJECT_VERSION: "12"
         PRODUCT_NAME: HabitJourney
         DEVELOPMENT_TEAM: B37332G6T2
         CODE_SIGN_STYLE: Manual

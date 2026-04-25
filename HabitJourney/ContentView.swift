@@ -8,20 +8,24 @@ struct ContentView: View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedTab) {
                 HomeView()
-                    .tabItem { Label("Journey", systemImage: "map.fill") }
+                    .tabItem { Label("Ritual", systemImage: "sun.max.fill") }
                     .tag(0)
 
-                HabitListView()
-                    .tabItem { Label("Habits", systemImage: "checkmark.circle.fill") }
+                JourneyView()
+                    .tabItem { Label("Journey", systemImage: "map.fill") }
                     .tag(1)
 
-                JournalView()
-                    .tabItem { Label("Journal", systemImage: "book.fill") }
+                HabitListView()
+                    .tabItem { Label("Forge", systemImage: "hammer.fill") }
                     .tag(2)
 
-                ProfileView()
-                    .tabItem { Label("Profile", systemImage: "person.circle.fill") }
+                JournalView()
+                    .tabItem { Label("Virtues", systemImage: "book.fill") }
                     .tag(3)
+
+                MentorView()
+                    .tabItem { Label("Mentor", systemImage: "person.fill.questionmark") }
+                    .tag(4)
             }
             .accentColor(.hjPrimary)
 

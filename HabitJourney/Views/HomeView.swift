@@ -39,6 +39,11 @@ struct HomeView: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 20)
 
+                        // 7-day challenges
+                        ChallengeSection()
+                            .padding(.horizontal, 16)
+                            .padding(.top, 20)
+
                         // Goal suggestions
                         if !habitVM.goalSuggestions.isEmpty {
                             SuggestionsSection()
@@ -266,5 +271,211 @@ private struct GoalSuggestionCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.hjGold.opacity(0.3), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - 7-Day Challenge Section
+
+private struct HabitChallenge: Codable {
+    var title: String
+    var emoji: String
+    var startDate: Date
+
+    var dayNumber: Int {
+        let days = Calendar.current.dateComponents([.day],
+            from: Calendar.current.startOfDay(for: startDate),
+            to: Calendar.current.startOfDay(for: Date())).day ?? 0
+        return min(days + 1, 7)
+    }
+
+    var isComplete: Bool { dayNumber >= 7 }
+}
+
+private struct ChallengeSection: View {
+    @State private var active: HabitChallenge? = nil
+    @State private var showPicker = false
+
+    private let presets: [(String, String)] = [
+        ("No phone first 30 min", "📵"),
+        ("Drink 8 glasses of water", "💧"),
+        ("Walk 10 minutes outdoors", "🚶"),
+        ("Read 10 pages", "📖"),
+        ("Write 3 gratitudes", "✍️"),
+        ("Sleep by 10 PM", "🌙"),
+        ("Meditate 5 minutes", "🧘"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.circle.fill").foregroundColor(.hjGold)
+                    Text("7-Day Challenge")
+                        .font(.title3).fontWeight(.bold).foregroundColor(.hjText)
+                }
+                Spacer()
+                if active == nil || active!.isComplete {
+                    Button(active?.isComplete == true ? "New Challenge" : "Start") {
+                        showPicker = true
+                    }
+                    .font(.caption).fontWeight(.semibold)
+                    .foregroundColor(.hjBackground)
+                    .padding(.horizontal, 14).padding(.vertical, 6)
+                    .background(LinearGradient.primaryGradient)
+                    .cornerRadius(20)
+                    .shadow(color: Color.hjPrimary.opacity(0.35), radius: 4)
+                }
+            }
+
+            if let challenge = active {
+                ActiveChallengeCard(challenge: challenge)
+            } else {
+                EmptyChallengePrompt { showPicker = true }
+            }
+        }
+        .onAppear { loadChallenge() }
+        .sheet(isPresented: $showPicker) {
+            ChallengePicker(presets: presets) { title, emoji in
+                active = HabitChallenge(title: title, emoji: emoji, startDate: Date())
+                saveChallenge()
+            }
+        }
+    }
+
+    private func loadChallenge() {
+        guard let data = UserDefaults.standard.data(forKey: "hj_challenge_v1"),
+              let decoded = try? JSONDecoder().decode(HabitChallenge.self, from: data) else { return }
+        active = decoded
+    }
+
+    private func saveChallenge() {
+        if let c = active, let data = try? JSONEncoder().encode(c) {
+            UserDefaults.standard.set(data, forKey: "hj_challenge_v1")
+        }
+    }
+}
+
+private struct ActiveChallengeCard: View {
+    let challenge: HabitChallenge
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                Text(challenge.emoji).font(.system(size: 32))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(challenge.title)
+                        .font(.subheadline).fontWeight(.semibold).foregroundColor(.hjText)
+                    if challenge.isComplete {
+                        Text("Challenge complete! 🎉")
+                            .font(.caption).foregroundColor(.hjGreen)
+                    } else {
+                        Text("Day \(challenge.dayNumber) of 7")
+                            .font(.caption).foregroundColor(.hjSubtext)
+                    }
+                }
+                Spacer()
+                Text("\(challenge.dayNumber)/7")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(challenge.isComplete ? .hjGreen : .hjPrimary)
+            }
+
+            // 7-dot progress
+            HStack(spacing: 8) {
+                ForEach(1...7, id: \.self) { day in
+                    ZStack {
+                        Circle()
+                            .fill(day <= challenge.dayNumber
+                                ? AnyView(LinearGradient.primaryGradient)
+                                : AnyView(Color.hjSurface2))
+                            .frame(width: 30, height: 30)
+                            .shadow(color: day <= challenge.dayNumber ? Color.hjPrimary.opacity(0.4) : .clear, radius: 4)
+
+                        if day <= challenge.dayNumber {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold)).foregroundColor(.white)
+                        } else {
+                            Text("\(day)").font(.system(size: 10)).foregroundColor(.hjSubtext)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(16)
+        .background(Color.hjSurface)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(challenge.isComplete ? Color.hjGreen.opacity(0.4) : Color.hjPrimary.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
+
+private struct EmptyChallengePrompt: View {
+    let onStart: () -> Void
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Text("⚡").font(.system(size: 32))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pick a 7-day challenge").font(.subheadline).fontWeight(.semibold).foregroundColor(.hjText)
+                Text("Build momentum with a focused one-week goal")
+                    .font(.caption).foregroundColor(.hjSubtext)
+            }
+            Spacer()
+        }
+        .padding(16)
+        .background(Color.hjSurface)
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.hjPrimary.opacity(0.15), lineWidth: 1))
+        .onTapGesture { onStart() }
+    }
+}
+
+private struct ChallengePicker: View {
+    let presets: [(String, String)]
+    let onSelect: (String, String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.hjBackground.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                RoundedRectangle(cornerRadius: 3).fill(Color.hjSurface2)
+                    .frame(width: 40, height: 5).padding(.top, 16).padding(.bottom, 20)
+
+                Text("Choose a Challenge")
+                    .font(.title2).fontWeight(.bold).foregroundColor(.hjText)
+                    .padding(.bottom, 20)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 10) {
+                        ForEach(presets, id: \.0) { title, emoji in
+                            Button {
+                                onSelect(title, emoji)
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Text(emoji).font(.system(size: 28))
+                                    Text(title)
+                                        .font(.subheadline).fontWeight(.medium).foregroundColor(.hjText)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption).foregroundColor(.hjSubtext)
+                                }
+                                .padding(16)
+                                .background(Color.hjSurface)
+                                .cornerRadius(14)
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.hjPrimary.opacity(0.1), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 32)
+                }
+            }
+        }
     }
 }

@@ -191,4 +191,8 @@ class HabitViewModel: ObservableObject {
             return (date: date, hasEntry: hasEntry)
         }.reversed()
     }
+
+    func hasAnyEntry(on date: Date) -> Bool {
+        habits.contains { dataStore.entry(for: $0, on: date) != nil }
+    }
 }
